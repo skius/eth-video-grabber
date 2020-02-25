@@ -1,0 +1,12 @@
+[
+  {
+    "username": "username from mail",
+    "password": "password from mail",
+    "base": "https://video.ethz.ch/lectures/d-math/2020/spring/401-0212-16L",
+    "course": "Analysis I"
+  },
+  {
+    "base": "https://video.ethz.ch/lectures/d-infk/2020/spring/252-0028-00L",
+    "course": "Digital Design and Computer Architecture"
+  }
+]
