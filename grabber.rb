@@ -14,16 +14,33 @@ def downloaded_ids
 end
 
 class Video
-  attr_accessor :url, :created_at, :id
-  def initialize(url:, created_at:, id:)
+  attr_accessor :url, :created_at, :id, :lecture
+  def initialize(url:, created_at:, id:, lecture:)
     @created_at = created_at
     @url = url
     @id = id
+    @lecture = lecture
+  end
+
+  def download
+    dest = "#{lecture.dir}/#{filename}"
+    puts "Saving to #{dest}"
+
+    FileUtils.mkdir_p(lecture.dir)
+    Down.download(url, destination: dest)
+
+    puts 'Saved.'
+
+    File.write('downloaded_ids', id + "\n", mode: 'a')
+  end
+
+  def filename
+    "#{created_at}_#{lecture.course.gsub(' ', '-')}_#{lecture.code}_#{id}.mp4"
   end
 end
 
 class Lecture
-  attr_accessor :username, :password, :base, :department, :year, :semester, :course, :code
+  attr_accessor :username, :password, :base, :department, :year, :semester, :course, :code, :ldap
 
   class << self
     def from_json(filename)
@@ -33,34 +50,58 @@ class Lecture
           username: lecture['username'],
           password: lecture['password'],
           base: lecture['base'],
-          course: lecture['course']
+          course: lecture['course'],
+          ldap: lecture['ldap']
         )
       end
     end
   end
 
-  def initialize(username:, password:, base:, course:)
+  def initialize(username:, password:, base:, course:, ldap:)
     @username = username
     @password = password
     @base = base
     @department, @year, @semester, @code = base.scan(%r{https://video\.ethz\.ch/lectures/(.*?)/(.*?)/(.*?)/(.*)}).first
     @course = course
+    @ldap = ldap ? true : false
   end
 
   def missing_episodes
     @missing_episodes ||= metadata['episodes'].reject { |e| downloaded_ids.include?(e['id']) }.map do |e|
       id = e['id']
-      Video.new(id: id, url: best_video_url(id), created_at: e['createdAt'].split('T')[0])
+      created_at = e['createdAt'].split('T')[0]
+      Video.new(id: id, url: best_video_url(id), created_at: created_at, lecture: self)
     end
+  end
+
+  def dir
+    "#{DOWNLOAD_DIR}/#{department}/#{year}/#{semester}/#{course}"
   end
 
   private
 
   def cookie
-    @cookie ||= Faraday.post(base + '.series-login.json') do |req|
+    @cookie ||= (ldap? ? ldap_cookie : series_cookie)
+  end
+
+  def series_cookie
+    Faraday.post(base + '.series-login.json') do |req|
       req.params['username'] = username
       req.params['password'] = password
     end.headers['set-cookie']
+  end
+
+  def ldap_cookie
+    Faraday.post(ldap_url) do |req|
+      req.params['j_username'] = username
+      req.params['j_password'] = password
+      req.params['j_validate'] = true
+      req.params['_charset_'] = 'utf-8'
+    end.headers['set-cookie']
+  end
+
+  def ldap_url
+    "https://video.ethz.ch/lectures/#{department}/#{year}/#{semester}/j_security_check"
   end
 
   def metadata
@@ -81,27 +122,23 @@ class Lecture
   def protected?
     username && password
   end
+
+  def ldap?
+    ldap
+  end
 end
 
 def download_missing_lectures
   lectures = Lecture.from_json 'lectures.json'
 
-  lectures.reject { |lecture| lecture.missing_episodes.empty? }.each do |lecture|
+  lectures.reject! { |lecture| lecture.missing_episodes.empty? }
+  lectures.each do |lecture|
     puts "Found #{lecture.missing_episodes.count} new #{lecture.missing_episodes.count > 1 ? 'episodes' : 'episode'} for lecture \"#{lecture.course}\"!"
 
-    lecture.missing_episodes.each do |video|
-      dest = "#{DOWNLOAD_DIR}/#{lecture.department}/#{lecture.year}/#{lecture.semester}/#{lecture.course}"
-      filename = "#{video.created_at}_#{lecture.course.gsub(' ', '-')}_#{lecture.code}_#{video.id}.mp4"
-      puts "Saving to #{dest}/#{filename}"
-
-      FileUtils.mkdir_p(dest)
-      Down.download(video.url, destination: "#{dest}/#{filename}")
-
-      puts 'Saved.'
-
-      File.write('downloaded_ids', video.id + "\n", mode: 'a')
-    end
+    lecture.missing_episodes.each(&:download)
   end
+
+  puts 'No new episodes found.' if lectures.empty?
 end
 
 download_missing_lectures
