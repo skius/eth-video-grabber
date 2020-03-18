@@ -1,3 +1,8 @@
+# ⚠️ COVID-19 DISCLAIMER ⚠️
+Please try to avoid downloading a lot of lectures during the current situation. The infrastructure behind video.ethz.ch might not be up to the task and it would be irresponsible to put additional strain on it.
+
+To do so, you can comment out the line starting with `Down.download...` in the `Video#download` method. This way the local database will be filled with all currently online lecture video IDs without downloading them. You can then handpick which ones to download by deleting the corresponding IDs from the file `downloaded_ids` and uncommenting the previously commented out code. To simply download all lectures going forward without downloading the backlog, uncomment the line after having it fill `downloaded_ids` and let it run normally (see "Usage" section below).
+
 # eth-video-grabber
 Download all [ETHZ](https://ethz.ch) lecture recordings you have access to.
 
