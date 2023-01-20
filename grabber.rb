@@ -115,8 +115,19 @@ class Lecture
     end.body).to_h
   end
 
+  def episode_audios(id)
+    JSON.parse(Faraday.get('https://video.ethz.ch/.episode-audio.json') do |req|
+      req.params['recordId'] = id
+      req.headers['cookie'] = cookie if protected?
+    end.body).to_h
+  end
+
   def best_video_url(id)
-    episode_videos(id)['streams'][0]['sources']['mp4'].max { |a, b| a['res']['w'].to_i - b['res']['w'].to_i }['src']
+    unless episode_videos(id)['streams'].length() == 0
+      episode_videos(id)['streams'][0]['sources']['mp4'].max { |a, b| a['res']['w'].to_i - b['res']['w'].to_i }['src']
+    else
+      episode_audios(id)['sources'][0]['src']
+    end
   end
 
   def protected?
