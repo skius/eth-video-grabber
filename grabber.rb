@@ -35,7 +35,8 @@ class Video
   end
 
   def filename
-    "#{created_at}_#{lecture.course.gsub(' ', '-')}_#{lecture.code}_#{id}.mp4"
+    extension = "#{url.match(/\w+$/)}"
+    "#{created_at}_#{lecture.course.gsub(' ', '-')}_#{lecture.code}_#{id}.#{extension}"
   end
 end
 
